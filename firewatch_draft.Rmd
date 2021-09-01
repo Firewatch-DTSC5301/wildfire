@@ -1,0 +1,159 @@
+---
+title: "Windfire Analysis in U.S."
+author: |
+  | Xingyu Chen
+  | Kaitlyn McGrew
+  | Tittiwat Tonburinthip
+  | Kexin Yu
+  | Thejas Kiran
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+    toc_depth: 2
+    df_print: kable
+    highlight: tango
+abstract: ''
+subtitle: Data Science as a Field - CU Boulder
+fontsize: 12pt
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.align='center', message=FALSE, cache=TRUE)
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if(!is.null(output)) {
+  if(output=="html") opts_chunk$set(out.width = '400px') else
+    opts_chunk$set(out.width='.6\\linewidth')
+}
+```
+
+```{r library dependency, warning=FALSE, echo=FALSE}
+library(RSQLite)
+library(dbplyr)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(xts)
+library(ggfortify)
+library(ggthemes)
+library(maps)
+library(mapdata)
+library(leaflet)
+library(kableExtra)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# create db connection
+conn <- dbConnect(SQLite(), 'FPA_FOD_20210617.sqlite')
+
+# pull the fires table into RAM
+fires <- tbl(conn, "Fires") %>% collect()
+
+# check size
+print(object.size(fires), units = 'Gb')
+
+# disconnect from db
+dbDisconnect(conn)
+
+tem <- matrix(colnames(fires), ncol = 1)
+colnames(tem)[1] <- "Related-Variable"
+tem <- cbind(tem, Description=c("Global unique identifier", "Unique identifier that contains information necessary to track back to the original record in the source dataset.","Type of source database or system that the record was drawn from (federal, nonfederal, or interagency).", "Insignificance", "Insignificance", "Active National Wildlife Coordinating Group Unit Name for the unit preparing the fire report", "Insignificance", "Insignificance", "Insignificance","Insignificance","Insignificance","Name of the incident from the fire report", "Insignificance", "Insignificance", "Insignificance","Insignificance","Insignificance","Calendar year in which the fire was discovered or confirmed to exist.", "Date on which the fire was discovered or confirmed to exist.", "Day of year on which the fire was discovered or confirmed to exist.", "Time of day that the fire was discovered or confirmed to exist.", "Code for the (statistical) cause of the fire.", "Description of the (statistical) cause of the fire.", "Insignificance", "Date on which the fire was declared contained or otherwise controlled (mm/dd/yyyy where mm=month, dd=day, and yyyy=year).", "Day of year on which the fire was declared contained or otherwise controlled.", "Time of day that the fire was declared contained or otherwise controlled (hhmm where hh=hour, mm=minutes).", "Estimate of acres within the final perimeter of the fire.", "Code for fire size based on the number of acres within the final fire perimeter expenditures (A=greater than 0 but less than or equal to 0.25 acres, B=0.26-9.9 acres, C=10.0-99.9 acres, D=100-299 acres, E=300 to 999 acres, F=1000 to 4999 acres, and G=5000+ acres).", "Latitude (NAD83) for point location of the fire (decimal degrees).", "Longitude (NAD83) for point location of the fire (decimal degrees).", "Insignificance","Two-letter alphabetic code for the state in which the fire burned (or originated), based on the nominal designation in the fire report.",     "County, or equivalent, in which the fire burned (or originated), based on nominal designation in the fire report.", "Insignificance","Insignificance"))
+kable(tem, "latex", booktabs = TRUE, longtable = TRUE, caption = "The related-variables in our data set.") %>%
+  kable_styling(full_width = TRUE, latex_options = c("hold_position", "repeat_header"))
+```
+
+\newpage  
+\tableofcontents  
+\listoffigures  
+\newpage
+
+
+
+
+Introduction
+==================
+
+Motivation
+------------------------------------------
+
+
+Related Applications 
+------------------------------------------
+
+
+
+Observations and Questions
+------------------------------------------
+
+
+\newpage 
+
+Design of Data and Methodology  
+====================================
+
+Data Resource and Explanation of Variables 
+------------------------------------------
+
+
+Preparing the Data 
+------------------------------------------
+
+
+\newpage
+
+Exploration 
+====================================
+
+  
+
+Title 1 
+------------------------------------------
+
+
+
+\newpage
+
+Title 2 
+------------------------------------------
+
+\newpage
+
+Title 3
+------------------------------------------
+
+
+\newpage
+
+Result and Discussion
+====================================
+
+Title 1
+------------------------------------------
+
+\newpage
+
+Title 2
+------------------------------------------
+
+\newpage
+
+Title 3
+------------------------------------------
+
+\newpage
+
+Title 4
+------------------------------------------
+
+\newpage
+
+Problems Tackled and Conclusion
+====================================
+
+\newpage
+
+References
+====================================
