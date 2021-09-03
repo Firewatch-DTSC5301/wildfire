@@ -1,0 +1,133 @@
+---
+title: "Firewatch"
+author: "Tittiwat Tonburinthip"
+date: "9/3/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("RSQLite")
+library(magrittr)
+library(dplyr)
+library(tidyverse)
+library(tibble)
+library(ggplot2)
+```
+
+Retrieve the data from SQLLite
+
+```{r Retrieve data from SQLlite}
+con <- dbConnect(drv=RSQLite::SQLite(), dbname="FPA_FOD_20210617.sqlite")
+
+## list all tables
+tables <- dbListTables(con)
+
+## exclude sqlite_sequence (contains table information)
+tables <- tables[tables != "sqlite_sequence"]
+
+lDataFrames <- vector("list", length=length(tables))
+
+## create a data.frame for each table
+for (i in seq(along=tables)) {
+  lDataFrames[[i]] <- dbGetQuery(conn=con, statement=paste("SELECT * FROM '", tables[[i]], "'", sep=""))
+}
+```
+
+Store dataframe in fire and place
+
+```{r store_data, echo=FALSE}
+fire=as_tibble(lDataFrames[[1]])
+View(fire)
+place=as_tibble(lDataFrames[[2]])
+View(place)
+```
+
+CONT_DATE and CONT_DOY have a lot of NA, but it's the same value as DISCOVERY_DATE, DISCOVERY_DOY
+```{r query, echo=FALSE}
+fire_clean<-fire %>%
+ select ( NWCG_REPORTING_UNIT_ID, FIRE_YEAR,DISCOVERY_DATE, DISCOVERY_DOY, NWCG_CAUSE_CLASSIFICATION, NWCG_GENERAL_CAUSE, FIRE_SIZE, FIRE_SIZE_CLASS, LATITUDE, LONGITUDE, STATE)%>%
+  mutate(DISCOVERY_DATE=parse_date(DISCOVERY_DATE, format="%m/%d/%Y %H:%M"),
+         FIRE_YEAR=as.character(FIRE_YEAR))
+
+```
+
+a= store the rows that have NA. It's only have one row that NWCG_CAUSE_CLASSIFICATION== NA, so delete it and store in fire_clean
+```{r clean_data, echo=FALSE}
+a=fire_clean[rowSums(is.na(fire_clean))>0,]
+#View(a)
+
+fire_clean=na.omit(fire_clean)
+
+```
+
+place_1 has a mutate column named NWCG_REPORTING_UNIT_ID.
+Then, LEFT JOIN with fire_clean_1
+```{r leftjoin, echo=FALSE}
+place_1<-place%>%
+  mutate(NWCG_REPORTING_UNIT_ID=UnitId)
+
+fire_clean_1<-fire_clean%>%
+  left_join(place_1, by='NWCG_REPORTING_UNIT_ID')
+#View(fire_clean_1)
+fire_clean_1=as_tibble(fire_clean_1)
+#View(fire_clean_1)
+```
+#Summary
+```{r summary, echo=FALSE}
+summary(fire_clean_1)
+```
+
+Prepare data for sparkline
+
+```{r trend_by_state, echo=FALSE}
+fire_clean_2<-fire_clean_1%>%
+  filter(Country=="US", DISCOVERY_DATE>='2016-01-01')%>%
+  group_by(STATE, DISCOVERY_DATE)%>%
+  summarise(count=n())%>%
+  mutate(cum=cumsum(count))%>%
+  arrange(STATE, DISCOVERY_DATE)
+
+View(fire_clean_2)
+```
+plot- Sparkline_cumulative fire in 5 years [start:01/01/2016]
+
+```{r plot}
+g <- fire_clean_2 %>% 
+  ggplot(aes(x = DISCOVERY_DATE, y = cum))+
+  facet_wrap(~ STATE, ncol = 9, scales ="free_y") +
+  geom_line()+ theme(axis.ticks.y = element_blank(), axis.text.y = element_blank())+
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())+theme(panel.background = element_rect(fill = "lightblue",
+                                colour = "lightblue",
+                                size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "white"), 
+  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',colour = "white"))+ylab('cumulative frequency of fire')
+g
+
+
+library(ggh4x)
+g + force_panelsizes(rows = unit(0.3, "in"),
+                     cols = unit(0.5, "in"))
+g
+```
+
+```{r bar_by_size, echo=FALSE}
+fire_clean_3<-fire_clean_1%>%
+  filter(Country=="US", DISCOVERY_DATE>='2013-01-01')%>%
+  group_by(FIRE_YEAR, FIRE_SIZE_CLASS)%>%
+  summarise(count=n())%>%
+  mutate(cum=cumsum(count))%>%
+  arrange(FIRE_YEAR)
+
+#View(fire_clean_3)
+```
+
+stack bar
+```{r barplot, echo=FALSE}
+ggplot(fire_clean_3, aes(fill=FIRE_SIZE_CLASS, y=count, x=FIRE_YEAR))+geom_bar(position="dodge", stat="identity")
+
+
+```
