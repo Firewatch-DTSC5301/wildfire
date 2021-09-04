@@ -90,7 +90,8 @@ fire_clean_2<-fire_clean_1%>%
   mutate(cum=cumsum(count))%>%
   arrange(STATE, DISCOVERY_DATE)
 
-View(fire_clean_2)
+#View(fire_clean_2)
+#View(fire_clean_1)
 ```
 plot- Sparkline_cumulative fire in 5 years [start:01/01/2016]
 
@@ -127,7 +128,27 @@ fire_clean_3<-fire_clean_1%>%
 
 stack bar
 ```{r barplot, echo=FALSE}
-ggplot(fire_clean_3, aes(fill=FIRE_SIZE_CLASS, y=count, x=FIRE_YEAR))+geom_bar(position="dodge", stat="identity")
+ggplot(fire_clean_3, aes(fill=FIRE_SIZE_CLASS, y=count, x=FIRE_YEAR))+geom_bar(position="dodge", stat="identity")+theme_minimal()
 
 
+```
+
+```{r prepare_data, echo=FALSE}
+fire_clean_4<-fire_clean_1%>%
+  filter(Country=="US", DISCOVERY_DATE>='2013-01-01')%>%
+  mutate(month_date=factor(months(DISCOVERY_DATE, abbreviate = TRUE), levels = month.abb))%>%
+  group_by(month_date)%>%
+  summarise(count=n())
+
+  
+  
+
+
+#View(fire_clean_3)
+```
+
+Which month do forest fires occur mostly? [IN US]
+```{r bar_chart, echo=FALSE}
+ggplot(fire_clean_4, aes(y=count, x=month_date))+geom_bar(position="dodge", stat="identity")+theme_minimal()+geom_text(aes(label=count), vjust=1.6, color="white",position = position_dodge(0.9), size=3.5)
+#View(fire_clean_3)
 ```
