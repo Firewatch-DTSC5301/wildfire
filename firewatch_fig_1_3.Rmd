@@ -1,0 +1,269 @@
+---
+title: "Windfire Analysis in U.S."
+author: |
+  | Xingyu Chen
+  | Kaitlyn McGrew
+  | Tittiwat Tonburinthip
+  | Kexin Yu
+  | Thejas Kiran
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+    toc_depth: 2
+    df_print: kable
+    highlight: tango
+abstract: ''
+subtitle: Data Science as a Field - CU Boulder
+fontsize: 12pt
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.align='center', message=FALSE, cache=TRUE)
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if(!is.null(output)) {
+  if(output=="html") opts_chunk$set(out.width = '400px') else
+    opts_chunk$set(out.width='.6\\linewidth')
+}
+```
+
+\newpage  
+\tableofcontents  
+\listoffigures  
+\newpage
+
+Introduction
+==================
+
+Motivation
+------------------------------------------
+
+
+Related Applications 
+------------------------------------------
+
+
+Observations and Questions
+------------------------------------------
+
+
+\newpage 
+
+Design of Data and Methodology  
+====================================
+```{r library dependency, warning=FALSE, echo=TRUE}
+library(RSQLite)
+library(tidyverse)
+library(dbplyr)
+library(lubridate)
+library(data.table)
+library(scales)
+library(usmap)
+#library(leaflet)
+library(kableExtra)
+```
+
+Data Resource and Explanation of Variables 
+------------------------------------------
+```{r Getting dataset, echo=TRUE, warning=FALSE}
+# create db connection
+conn <- dbConnect(SQLite(), 'FPA_FOD_20210617.sqlite')
+
+# pull the fires table into RAM
+fires <- tbl(conn, "Fires") %>% collect()
+
+# disconnect from db
+dbDisconnect(conn)
+
+# select the column we need for this project
+fires <- fires[,c('FIRE_NAME', 'DISCOVERY_DATE', 'NWCG_CAUSE_CLASSIFICATION', 'NWCG_GENERAL_CAUSE','CONT_DATE', 'FIRE_SIZE', 'FIRE_SIZE_CLASS', 'LATITUDE', 'LONGITUDE', 'STATE', 'COUNTY', 'FIPS_CODE','FIPS_NAME')]
+```
+
+```{r description for variable, echo=FALSE, warning=FALSE}
+fire_df_colname <- matrix(colnames(fires), ncol = 1)
+colnames(fire_df_colname)[1] <- "Related-Variable"
+fire_df_colname <- cbind(fire_df_colname, Description=c('Name of the incident from the fire report', 'Date on which the fire was discovered or confirmed to exist.','Code for the (statistical) cause of the fire', 'Description of the (statistical) cause of the fire.', 'Date on which the fire was declared contained or otherwise controlled (mm/dd/yyyy where mm=month, dd=day, and yyyy=year).', 'Estimate of acres within the final perimeter of the fire.', 'Code for fire size based on the number of acres within the final fire perimeter expenditures (A=greater than 0 but less than or equal to 0.25 acres, B=0.26-9.9 acres, C=10.0-99.9 acres, D=100-299 acres, E=300 to 999 acres, F=1000 to 4999 acres, and G=5000+ acres).', 'Latitude (NAD83) for point location of the fire (decimal degrees).', 'Longitude (NAD83) for point location of the fire (decimal degrees).', 'Two-letter alphabetic code for the state in which the fire burned (or originated), based on the nominal designation in the fire report.', 'County, or equivalent, in which the fire burned (or originated), based on nominal designation in the fire report.', 'Unit code (follows state code to create UnitId).', 'Unit name'))
+text_tbl <- as.data.frame(fire_df_colname)
+```
+
+```{r kable related variable, echo=TRUE, warning=FALSE}
+# kable related variable
+kbl(text_tbl, booktabs = T, longtable = T, caption = "The related-variables in our data set.") %>%
+  kable_styling(full_width = T) %>%
+  column_spec(1, color = "red") %>%
+  column_spec(2, width = "25em")
+```
+
+Preparing the Data 
+------------------------------------------
+
+```{r average wildfire count by Day of Year, fig.cap="Average Number of US Wildfires by Day of Year. Observe the trend of wildfires count over Time",  out.width='98%', out.height='98%', echo=TRUE, warning=FALSE}
+fires_1 <- as.data.frame(fires)
+
+fires_1$DISCOVERY_DATE<-as.Date(fires_1$DISCOVERY_DATE, format = "%m/%d/%Y")
+
+fires_1 <- fires_1 %>%
+  mutate(day = format(DISCOVERY_DATE, "%d"),
+         month = format(DISCOVERY_DATE, "%m"), 
+         year = format(DISCOVERY_DATE, "%Y")) %>%
+  group_by(month, day) %>%
+  summarise(total = n()) %>%
+  mutate(date = make_date(month = month, day = day))
+  
+ggplot() +
+  geom_line(aes(x = date, y = total/27), fires_1, color = 'orange') +
+  scale_x_date(date_breaks= "1 month", date_labels = "%b") +
+  xlab("Day of Year") + ylab("Number of wildfire") +
+  theme(plot.background = element_rect(fill = "#BFD5E3"))
+```
+
+To prepare data for this figure, fire_1 was created from fire and assigned to be a dataframe. Then, we dealt with the date column because the type of date was known as character. Therefore, we use the format function to assign them as day, month, and year, respectively, and assigned them in each new column by “mutate” function in Tidyverse. After that, the dataframe was grouped by month and day and was counted to determine the frequency of wildfires in each day. Finally, we create a new column using make_date function to store date data to be x-axis in our graph. 
+After prepared the fire_1, GGPLOT2 was used to visualize by using the geom_line function. The frequency of wildfires in each day was average by 27, which is the number of years in our data. Therefore, the y-axis is the average frequency of wildfires and the x-axis is the date in one year. 
+To summarize, over the past 26 years from 1992 to 2018, July is the month that wildfires occur more often than the other months. The reason is that this month is in summer, so high temperatures together with dry weather can easily ignite wildfires.
+
+
+```{r Number of Wildfires by Size Class, fig.cap="Number of US Wildfires by Size Class per year. ", out.width='99%', out.height='99%', echo=TRUE, warning=FALSE}
+fires_2 <- as.data.frame(fires)
+size_classes <- c('A' = '0-0.25',
+                  'B' = '0.26-9.9',
+                  'C' = '10.0-99.9',
+                  'D' = '100-299',
+                  'E' = '300-999',
+                  'F' = '1000-4999',
+                  'G' = '5000+')
+fires_2 <- fires_2 %>%
+  group_by(FIRE_SIZE_CLASS) %>%
+  summarize(total = n()) %>%
+  mutate(FIRE_SIZE_CLASS = size_classes[FIRE_SIZE_CLASS])
+
+ggplot(data = fires_2, aes(x=FIRE_SIZE_CLASS, y = total/27, fill =FIRE_SIZE_CLASS)) + 
+  geom_bar(stat = "identity") + 
+  scale_fill_brewer(palette = "Reds") +
+  xlab("Fire size (acres)") + ylab("Number of wildfires") +
+  geom_text(label = paste0(round(fires_2$total/sum(fires_2$total)*100, 1), "%")) +
+  theme(plot.background = element_rect(fill = "#BFD5E3"))
+```
+
+```{r Number of wildfires by cause, fig.cap="Number of US Wildfires by cause type. ", out.width='97%', out.height='97%', echo=TRUE, warning=FALSE}
+fires_3 <- as.data.frame(fires)
+fires_3 <- fires_3 %>%
+  group_by(NWCG_CAUSE_CLASSIFICATION) %>%
+  summarize(total = n()) %>%
+  na.omit() %>%
+  arrange(desc(total))
+
+ggplot(data = fires_3) + 
+  geom_bar(aes(x = "", y = total, fill = NWCG_CAUSE_CLASSIFICATION), stat = "identity") +   
+  geom_text(aes(x = "", y = total, label = paste0(round(fires_3$total / sum(fires_3$total) * 100, 1), "%"))) +
+  coord_polar(theta = "y") +
+  theme_void()
+
+fires_4 <- as.data.frame(fires)
+fires_4 <- fires_4 %>%
+  group_by(NWCG_GENERAL_CAUSE) %>%
+  summarize(total = n()/1000) %>%
+  na.omit() %>%
+  arrange(desc(total))
+
+ggplot(data = fires_4) + 
+  geom_bar(aes(x = reorder(NWCG_GENERAL_CAUSE, total), y = total), stat = "identity", fill = 'orange') + 
+  coord_flip() +
+  xlab("NWCG_GENERAL_CAUSE") + ylab("Number of wildfires (thousands)") +
+  theme(plot.background = element_rect(fill = "#BFD5E3"))
+```
+
+To prepare data to Figure 3, fire_3 was created from fire and assigned to be a dataframe. Then, the data were grouped by the “NWCG_CAUSE_CLASSIFICATION” column. After that, the data were summarized and counted by summarize function in Tidyverse. Finally, the data were shown in the pie chart format by GGPLOT2. The graph indicated human behavior has a large amount of impact on wildfire than other types of causes.
+
+To prepare data to Figure 4, fire_4 was created from fire and assigned to be a dataframe and then was arranged in the same way as fire_3. Finally, the data were shown in the bar chart format and then the graph was flipped in the horizontal for better understanding.
+After the graph was analyzed, human behavior such as arson, recreation and ceremony, and debris and open burning has a large impact on wildfires. However, several data cannot be identified for the cause of wildfires, which is shown as missing data/ unspecified/ undetermined
+
+```{r relationship between fire size and cause, fig.cap="average wildfire size by cause. ", out.width='96%', out.height='96%', echo=TRUE, warning=FALSE}
+fires_5 <- as.data.frame(fires)
+fires_5 <- fires_5 %>%
+  group_by(NWCG_GENERAL_CAUSE) %>%
+  summarize(mean_size = mean(FIRE_SIZE, na.rm = TRUE)) %>%
+  na.omit() %>%
+  arrange(desc(mean_size))
+
+ggplot(data = fires_5) + 
+  geom_bar(aes(x = reorder(NWCG_GENERAL_CAUSE, mean_size), y = mean_size), stat = "identity", fill = 'orange') + 
+  coord_flip() +
+  xlab("NWCG_GENERAL_CAUSE") + ylab("Acres") +
+  theme(plot.background = element_rect(fill = "#BFD5E3"))
+```
+
+```{r fig.width=12, fig.height=8, fig.cap="US Wildfres, 1992-2018. The spectrum from white to darkred indicates more wildfires in that state", out.width='100%', out.height='100%', echo=TRUE, warning=FALSE}
+fires_6 <- as.data.frame(fires)
+fires_6 <- fires_6 %>%
+  group_by(STATE) %>%
+  summarize(total = n()) %>%
+  na.omit()
+fires_6 <- as.data.frame(fires_6)
+colnames(fires_6)[1] = "state"
+
+plot_usmap(data = fires_6, values = "total", color = "red", labels = TRUE) + 
+  scale_fill_continuous(low = "white", high = "darkred", 
+                        name = "Number of fires", label = scales::comma) + 
+  theme(legend.position = "right",
+        legend.title = element_text(size=16), 
+        legend.text = element_text(size=18),
+        plot.title = element_text(size=24),
+        plot.caption = element_text(size=20),
+        panel.background = element_rect(colour = "black"))
+```
+
+```{r fig.width=12, fig.height=8, fig.cap="US Wildfires in CA, 1992-2018. The spectrum from white to darkred indicates more wildfires in that state", out.width='101%', out.height='101%', echo=TRUE, warning=FALSE}
+fires_7 <- as.data.frame(fires)
+fires_7 <- fires_7 %>%
+  filter(STATE == 'CA') %>%
+  group_by(FIPS_CODE) %>%
+  summarize(total = n()) %>%
+  na.omit()
+fires_7 <- as.data.frame(fires_7)
+colnames(fires_7)[1] = "fips"
+#fires_7 <- fires_7[c("LONGITUDE","LATITUDE","total")]
+#fire_transformed <- usmap::usmap_transform(fires_7)
+
+
+plot_usmap(data = fires_7, values = "total", "counties", include = c("CA"), labels = TRUE) +
+#  geom_point(data = fires_7, aes(x = LONGITUDE.1, y = LATITUDE.1, size = total), color = "red", alpha = 0.5) +
+  scale_fill_continuous(low = "white", high = "darkred", name = "Number of fires", label = scales::comma) +
+  theme(legend.position = "right",
+        legend.title = element_text(size=16), 
+        legend.text = element_text(size=10),
+        plot.title = element_text(size=24),
+        plot.caption = element_text(size=20),
+        panel.background = element_rect(colour = "black"))
+```
+
+
+\newpage
+
+Exploration
+====================================
+
+Title 1 
+------------------------------------------
+
+\newpage
+
+Title 2 
+------------------------------------------
+
+\newpage
+
+Title 3
+------------------------------------------
+
+\newpage
+
+Problems Tackled and Conclusion
+====================================
+
+\newpage
+
+References
+====================================
