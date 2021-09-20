@@ -1,0 +1,117 @@
+---
+title: "Windfire Analysis in U.S."
+author: |
+  | Xingyu Chen
+  | Kaitlyn McGrew
+  | Tittiwat Tonburinthip
+  | Kexin Yu
+  | Thejas Kiran
+subtitle: Data Science as a Field - CU Boulder
+fontsize: 12pt
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library dependency, warning=FALSE, echo=FALSE}
+library(DBI)
+library(RSQLite)
+library(tidyverse)
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# create db connection
+conn <- dbConnect(SQLite(), '/Users/kaitlynmcgrew/Desktop/CUB_S1/DTSC5301/Data Science as a Field/wildfire/RDS-2013-0009/Data/FPA_FOD_20210617.sqlite')
+
+# pull the fires table into RAM
+fires <- tbl(conn, "Fires") %>% collect()
+
+# check size
+print(object.size(fires), units = 'Gb')
+
+# disconnect from db
+dbDisconnect(conn)
+
+```
+
+\newpage  
+\tableofcontents  
+\listoffigures  
+\newpage
+
+
+
+
+Introduction
+==================
+
+Wildfires, like many other natural disasters, demand everyone's attention. From being a direct threat to the constant reminder of a smoke caused haze. Recently, the attention put on wildfires has increased and wildfires seem to be growing in frequency and severity. The data provided by the US Forest Service, tracks all wildfires occurring between 1992 to 2018. Using this, this report will attempt to answer the following questions:
+
+1. Have wildfires increased in frequency and severity?
+2. Out of all the States, which are at most risk for wildfires?
+3. For the top 10 riskiest States, when is the riskiest time period for a wildfire to occur?
+
+
+
+
+\newpage 
+
+Design of Data and Methodology  
+====================================
+
+Data Source
+------------------------------------------
+
+
+Preparing the Data 
+------------------------------------------
+```{r echo=TRUE}
+fires_clean <- fires %>% select(FOD_ID, FIRE_YEAR, DISCOVERY_DATE, DISCOVERY_DOY, NWCG_CAUSE_CLASSIFICATION, NWCG_GENERAL_CAUSE, CONT_DATE, CONT_DOY, FIRE_SIZE, FIRE_SIZE_CLASS, STATE, COUNTY) %>% drop_na(STATE, FIRE_YEAR, FIRE_SIZE) %>% mutate_at(vars(DISCOVERY_DATE, CONT_DATE),  as.Date, format = "%m/%d/%Y")
+```
+
+```{r echo=TRUE}
+
+fires_date <- fires_clean %>% select(FIRE_YEAR, FIRE_SIZE) %>% group_by(FIRE_YEAR) %>% summarise(Total_Fires = n(), Burn_Size = sum(FIRE_SIZE))
+
+```
+
+\newpage
+
+Exploration 
+====================================
+
+Question 1. Frequency and Severity 
+------------------------------------------
+
+```{r echo=FALSE}
+
+fires_date %>% ggplot(aes(x= FIRE_YEAR)) + geom_col(aes(y = Total_Fires), fill = "darkred") + stat_smooth(aes(method = "lm", y = Total_Fires), color = "darkblue", fill = "royalblue") +  scale_x_continuous(name = " Year", breaks = round(seq(min(fires_date$FIRE_YEAR), max(fires_date$FIRE_YEAR), by = 2),1)) +scale_y_continuous(name = "# of Fires", labels = scales::comma)  + theme_text + ggtitle("Total Fires per Year")
+
+fires_date %>% ggplot(aes(x= FIRE_YEAR)) + geom_line(aes(y = Burn_Size),size = 1, color = "darkred") + stat_smooth(aes(method = "lm", y = Burn_Size), fill = "royalblue", color = "darkblue") +  scale_x_continuous(name = " Year", breaks = round(seq(min(fires_date$FIRE_YEAR), max(fires_date$FIRE_YEAR), by = 2),1)) +scale_y_continuous(name = "Acres", labels = scales::comma)  + theme_text + ggtitle("Total Acres Burned per Year")
+```
+  
+Observing the first plot, *Total Fires Per Year*, it shows the number of fires has not increased. In fact the data shows there was a peak around 2006 after which the number of fires decreased. However, the second plot, *Total Acres Burned per Year*, shows that the number of acres burned per year, or the severity of the fires that year, has steadily increased.
+
+```{r echo=FALSE}
+theme_text <- theme(
+    plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    legend.justification = c(0, 1),
+    legend.position = c(0, 1),
+    axis.ticks = element_line(colour = "white", size = 0.2),
+    panel.grid.major = element_line(colour = "white", size = 0.2),
+    panel.grid.minor = element_blank()
+  ) + theme_bw()
+
+```
+
+
+Possible Bias and Conclusion
+====================================
+
+The conclusion that can be drawn from the first two plots is the number of wildfires has not increased during the time frame of the data set. However the total number of acres burned per year has steadily increased, indicating the severity of the fires has gotten worse over time. 
+
+Some possible problems with the data influence these conclusions however. It's unclear if the method of counting wildfires has changed over the years. It's possible what used to count as a wildfire does not, or in other terms, fires that occurred in the 90's might not count as a wildfire now, and would not be included in the data. Another possible issue is how the acres burned per fire is tracked and recorded. Over the years how they estimate the total acres may have changed as technologies (such as satellite imaging) have improved. Both of these possible biases could be influencing the findings in this section, as they are occurring over time.
