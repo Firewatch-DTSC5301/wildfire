@@ -1,5 +1,5 @@
 ---
-title: "Windfire Analysis in U.S."
+title: "Wildfire Analysis in U.S."
 author: |
   | Xingyu Chen
   | Kaitlyn McGrew
@@ -14,7 +14,7 @@ output:
     toc_depth: 2
     df_print: kable
     highlight: tango
-abstract: 'The smoke from the California wildfire in 2021 has massively impacted the air quality of Colorado State, especially in Denver metro area, Colorado Spring, and Fort Collins. It is necessary to make a data product that shows how is the wildfire trend over time by month? Which state and counties have the most wildfire? What is the main cause of wildfire? In our project, we want to perform research on the wildfire in the U.S. occur in the past few years based on different categories such as discovery date, fire cause, and fire size. The dataset will also include location information like state and county name so that we can plot a map view of the data product and compare frequency by wildfire counts. We will use different charts generated with R along with the related R library and analyze the result. At the end of our project, we will conclude the features of wildfire in the U.S. and make a recommendation for travel enthusiasts and hiking. '
+abstract: 'Wildfires, like many other natural disasters, demand everyones'' attention. From being a direct threat to the constant reminder of a smoke caused haze.The smoke from the California wildfire in 2021 has massively impacted the air quality of Colorado State. It is necessary to make a data product that shows how is the wildfire trend over time by month? Which state and counties have the most wildfire? What is the main cause of wildfire? In our project, we want to perform research on the wildfire in the U.S. occur in the past few years based on different categories such as discovery date, fire cause, and fire size. The dataset will also include location information like state and county name so that we can plot a map view of the data product and compare frequency by wildfire counts. We will use different charts generated with R along with the related R library and analyze the result. At the end of our project, we will conclude the features of wildfire in the U.S. and make a recommendation for travel enthusiasts and hiking. '
 subtitle: Data Science as a Field - CU Boulder
 fontsize: 12pt
 geometry: margin=1in
@@ -82,7 +82,7 @@ The aim of data collection definitely focus on if the dataset contains fire size
 Thanks to [**U.S. DEPARTMENT OF AGRICULTURE**](https://www.fs.usda.gov/rds/archive/Catalog/RDS-2013-0009.5), we were able to get a table of information of 2,166,753 wildfire in U.S. from 1992 to 2018, along with fire cause, discovery date, fire size as shown in Table 1.  
 ```{r Getting dataset, echo=TRUE, warning=FALSE}
 # create db connection
-conn <- dbConnect(SQLite(), 'FPA_FOD_20210617.sqlite')
+conn <- dbConnect(SQLite(), 'https://drive.google.com/file/d/1TgJFYQVh1qMOQW8Z7jsQ9vlypaU83wuD/view?usp=sharing')
 
 # pull the fires table into RAM
 fires <- tbl(conn, "Fires") %>% collect()
@@ -243,7 +243,10 @@ ggplot(data = fires_3) +
   geom_bar(aes(x = "", y = total, fill = NWCG_CAUSE_CLASSIFICATION), stat = "identity") +   
   geom_text(aes(x = "", y = total, label = paste0(round(total / sum(total) * 100, 1), "%"))) +
   coord_polar(theta = "y") +
-  theme_void()
+  theme_void() +
+  theme(legend.position = "right",
+        legend.title = element_text(size=10), 
+        legend.text = element_text(size=8))
 ```
 \newpage
 
@@ -314,13 +317,14 @@ fires_7 <- fires_7 %>%
   na.omit()
 fires_7 <- as.data.frame(fires_7)
 colnames(fires_7)[1] = "fips"
-plot_usmap(data = fires_7, values = "total", "counties", include = c("CA"), labels = TRUE) +
+plot_usmap(data = fires_7, values = "total", "counties", include = c("CA"), labels = TRUE, size = 0.4) +
   scale_fill_continuous(low = "white", high = "darkred", name = "Number of fires", label = scales::comma) +
-  theme(legend.position = "right",
+  theme(
+        legend.position = "right",
         legend.title = element_text(size=16), 
-        legend.text = element_text(size=10),
+        legend.text = element_text(size=18),
         plot.title = element_text(size=24),
-        plot.caption = element_text(size=20),
+        plot.caption = element_text(size=22),
         panel.background = element_rect(colour = "black"))
 ```
 \newpage
@@ -332,5 +336,36 @@ Problems Tackled and Conclusion
 
 References
 ====================================
+[1] Colorado's Air Quality is Pretty Bad Today And Will Get Worse             
+   https://www.cpr.org/2021/08/05/colorado-air-quality-bad-today-will-get-worse/ 
 
+[2] California WildFires (2013-2020)  - Kaggle Data website,  
+    https://www.kaggle.com/ananthu017/california-wildfire-incidents-20132020
+
+[3] Spatial wildfire occurrence data for the United States, 1992-2018  - U.S. Department of Agriculture,  
+    https://www.fs.usda.gov/rds/archive/Catalog/RDS-2013-0009.5
+    
+[4] R Core Team, R: A Language and Environment for Statistical Computing, R Foundation for Statistical Computing, Vienna, Austria,  
+    http://www.R-project.org/, 2021
+
+[5] Yihui Xie knitr: A general-purpose package for dynamic report generation in R,  
+    http://yihui.name/knitr/, 2021
+    
+[6] Different Ways of Plotting U.S. Map in R,  
+   https://jtr13.github.io/cc19/different-ways-of-plotting-u-s-map-in-r.html#using-usmap-package, 2021
+    
+[7] Census Regions and Divisions of the United States - U.S. Census Bureau,  
+    https://www2.census.gov/geo/pdfs/maps-data/maps/reference/us_regdiv.pdf, 2021
+    
+[8] Easy way to mix multiple graphs on the same page - ggplot2 package,  
+    http://www.sthda.com/english/articles/24-ggpubr-publication-ready-plots/81-ggplot2-easy-way-to-mix-multiple-graphs-on-the-same-page/    
+
+[9] 1.88 Million US Wildfires - Kaggle Data website,  
+    https://www.kaggle.com/rtatman/188-million-us-wildfires
+    
+[10] Figures, Tables, Captions - R Markdown for Scientists,  
+    https://rmd4sci.njtierney.com/figures-tables-captions-.html, 2021
+
+[11] Yang Liu ggplot US state heatmap - usmap package,  
+    https://liuyanguu.github.io/post/2020/06/12/ggplot-us-state-and-china-province-heatmap/, 2021
 
