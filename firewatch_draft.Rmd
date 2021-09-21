@@ -82,19 +82,18 @@ The aim of data collection definitely focus on if the dataset contains fire size
 Thanks to [**U.S. DEPARTMENT OF AGRICULTURE**](https://www.fs.usda.gov/rds/archive/Catalog/RDS-2013-0009.5), we were able to get a table of information of 2,166,753 wildfire in U.S. from 1992 to 2018, along with fire cause, discovery date, fire size as shown in Table 1.  
 ```{r Getting dataset, echo=TRUE, warning=FALSE}
 # create db connection
-conn <- dbConnect(SQLite(), 'https://drive.google.com/file/d/1TgJFYQVh1qMOQW8Z7jsQ9vlypaU83wuD/view?usp=sharing')
-
+conn <- dbConnect(SQLite(), 'FPA_FOD_20210617.sqlite')
 # pull the fires table into RAM
 fires <- tbl(conn, "Fires") %>% collect()
-
+fires_date <- fires
 # disconnect from db
 dbDisconnect(conn)
-
 # select the column we need for this project
-fires <- fires[,c('FIRE_NAME', 'DISCOVERY_DATE', 'NWCG_CAUSE_CLASSIFICATION', 
-                  'NWCG_GENERAL_CAUSE','CONT_DATE', 'FIRE_SIZE',
-                  'FIRE_SIZE_CLASS', 'LATITUDE', 'LONGITUDE',
-                  'STATE', 'COUNTY', 'FIPS_CODE','FIPS_NAME')]
+fires <- fires[,c('FIRE_NAME', 'FIRE_YEAR', 'DISCOVERY_DATE', 
+                  'NWCG_CAUSE_CLASSIFICATION', 
+                  'NWCG_GENERAL_CAUSE', 'FIRE_SIZE',
+                  'FIRE_SIZE_CLASS',
+                  'STATE', 'FIPS_CODE')]
 ```
 
 ```{r description for variable, echo=TRUE, warning=FALSE}
@@ -102,20 +101,18 @@ fires <- fires[,c('FIRE_NAME', 'DISCOVERY_DATE', 'NWCG_CAUSE_CLASSIFICATION',
 fire_df_colname <- matrix(colnames(fires), ncol = 1)
 colnames(fire_df_colname)[1] <- "Related-Variable"
 # cbind the description for variable
-fire_df_colname <- cbind(fire_df_colname, 
-                         Description=c('Name of the incident from the fire report', 
-                                                        'Date on which the fire was discovered or confirmed to exist.',
-                                                        'Code for the (statistical) cause of the fire', 
-                                                        'Description of the (statistical) cause of the fire.', 
-                                                        'Date on which the fire was declared contained or otherwise controlled (mm/dd/yyyy where mm=month, dd=day, and yyyy=year).', 
-                                                        'Estimate of acres within the final perimeter of the fire.', 
-                                                        'Code for fire size based on the number of acres within the final fire perimeter expenditures (A=greater than 0 but less than or equal to 0.25 acres, B=0.26-9.9 acres, C=10.0-99.9 acres, D=100-299 acres, E=300 to 999 acres, F=1000 to 4999 acres, and G=5000+ acres).', 
-                                                        'Latitude (NAD83) for point location of the fire (decimal degrees).', 
-                                                        'Longitude (NAD83) for point location of the fire (decimal degrees).', 
-                                                        'Two-letter alphabetic code for the state in which the fire burned (or originated), based on the nominal designation in the fire report.', 
-                                                        'County, or equivalent, in which the fire burned (or originated), based on nominal designation in the fire report.', 
-                                                        'Unit code (follows state code to create UnitId).', 
-                                                        'Unit name'))
+fire_df_colname <- 
+  cbind(fire_df_colname, 
+        Description=
+        c('Name of the incident from the fire report', 
+          'Date of Year on that fire',
+          'Date on which the fire was discovered or confirmed to exist',
+          'Code for the (statistical) cause of the fire', 
+          'Description of the (statistical) cause of the fire.', 
+          'Estimate of acres within the final perimeter of the fire.', 
+          'Code for fire size based on the number of acres within the final fire perimeter expenditures (A=greater than 0 but less than or equal to 0.25 acres, B=0.26-9.9 acres, C=10.0-99.9 acres, D=100-299 acres, E=300 to 999 acres, F=1000 to 4999 acres, and G=5000+ acres).', 
+          'Two-letter alphabetic code for the state in which the fire burned (or originated), based on the nominal designation in the fire report.', 
+          'Numbers which uniquely identify geographic areas.'))
 text_tbl <- as.data.frame(fire_df_colname)
 ```
 
@@ -197,17 +194,46 @@ fires_1 <- fires_1 %>%
          month = format(DISCOVERY_DATE, "%m"), 
          year = format(DISCOVERY_DATE, "%Y")) %>%
   group_by(month, day) %>%
-  summarise(total = n()) %>%
+  summarise(total = sum(FIRE_SIZE)/27) %>%
   mutate(date = make_date(month = month, day = day))
 ggplot() +
-  geom_line(aes(x = date, y = total/27), fires_1, color = 'orange') +
+  geom_line(aes(x = date, y = total), fires_1, color = 'darkred') +
   scale_x_date(date_breaks= "1 month", date_labels = "%b") +
-  xlab("Day of Year") + ylab("Number of wildfire") +
+  xlab("Day of Year") + ylab("Number of Acres Burned") +
   theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
+\newpage
+Title 1 
+------------------------------------------
+```{r average wildfire coucsant by Day of Year, fig.cap="Avercsage Number of US Wildfires by Day of Year. Observe the trend of wildfires count over Time",  out.width='105%', out.height='105%', echo=TRUE, warning=FALSE}
+fires_date <- fires %>% 
+  select(FIRE_YEAR, FIRE_SIZE) %>% 
+  group_by(FIRE_YEAR) %>% 
+  summarise(Total_Fires = n(), Burn_Size = sum(FIRE_SIZE))
 
+fires_date %>% 
+  ggplot(aes(x= FIRE_YEAR, y = Total_Fires)) + 
+  geom_bar(stat = 'identity', fill = 'darkred') + 
+  geom_smooth(method = 'lm') +
+  scale_x_continuous(name = " Year", breaks = round(seq(min(fires_date$FIRE_YEAR), max(fires_date$FIRE_YEAR), by = 2),1)) +
+  scale_y_continuous(name = "# of Fires", labels = scales::comma) + 
+  ggtitle("Total Fires per Year")
+```
+\newpage
+Title 1 
+------------------------------------------
+```{r average wildfire coucsant caby Day of Year, fig.cap="Avercsage Number of US Wildfires by Day of Year. Observe the trend of wildfires count over Time",  out.width='106%', out.height='106%', echo=TRUE, warning=FALSE}
+fires_date %>% 
+  ggplot(aes(x= FIRE_YEAR, y = Burn_Size)) + 
+  geom_line(size = 1, color = "darkred") + 
+  geom_smooth(method = 'lm') +  
+  scale_x_continuous(name = "Year", breaks = round(seq(min(fires_date$FIRE_YEAR), max(fires_date$FIRE_YEAR), by = 2),1)) +
+  scale_y_continuous(name = "Acres", labels = scales::comma) + 
+  labs(x = '', y = 'Number of Acres Burned', title = 'US Wildfires by Year')
+```
 
 \newpage
+
 
 Title 2 
 ------------------------------------------
@@ -219,11 +245,11 @@ size_classes <- c('A' = '0-0.25', 'B' = '0.26-9.9',
                   'G' = '5000+')
 fires_2 <- fires_2 %>%
   group_by(FIRE_SIZE_CLASS) %>%
-  summarize(total = n()) %>%
+  summarize(total = n()/27) %>%
   mutate(FIRE_SIZE_CLASS = size_classes[FIRE_SIZE_CLASS])
-ggplot(data = fires_2, aes(x=FIRE_SIZE_CLASS, y = total/27, fill =FIRE_SIZE_CLASS)) + 
+ggplot(data = fires_2, aes(x=FIRE_SIZE_CLASS, y = total, fill =FIRE_SIZE_CLASS)) + 
   geom_bar(stat = "identity") + scale_fill_brewer(palette = "Reds") +
-  xlab("Fire size (acres)") + ylab("Number of wildfires") +
+  xlab("Number of Acres Burned") + ylab("Number of wildfires per Year") +
   geom_text(label = paste0(round(fires_2$total/sum(fires_2$total)*100, 1), "%")) +
   theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
@@ -250,22 +276,6 @@ ggplot(data = fires_3) +
 ```
 \newpage
 
-Title 4
-------------------------------------------
-```{r Number of wildfires by cause 2, fig.cap="Number of US Wildfires by cause type 2. ", out.width='91%', out.height='91%', echo=TRUE, warning=FALSE}
-fires_4 <- as.data.frame(fires)
-fires_4 <- fires_4 %>%
-  group_by(NWCG_GENERAL_CAUSE) %>%
-  summarize(total = n()/1000) %>%
-  na.omit() %>%
-  arrange(desc(total))
-ggplot(data = fires_4) + 
-  geom_bar(aes(x = reorder(NWCG_GENERAL_CAUSE, total), y = total), stat = "identity", fill = 'orange') + 
-  coord_flip() +
-  xlab("NWCG_GENERAL_CAUSE") + ylab("Number of wildfires (thousands)") +
-  theme(plot.background = element_rect(fill = "#BFD5E3"))
-```
-\newpage
 
 Title 5
 ------------------------------------------
@@ -277,26 +287,26 @@ fires_5 <- fires_5 %>%
   na.omit() %>%
   arrange(desc(mean_size))
 ggplot(data = fires_5) + 
-  geom_bar(aes(x = reorder(NWCG_GENERAL_CAUSE, mean_size), y = mean_size), stat = "identity", fill = 'orange') + 
+  geom_bar(aes(x = reorder(NWCG_GENERAL_CAUSE, mean_size), y = mean_size), stat = "identity", fill = 'darkred') + 
   coord_flip() +
-  xlab("NWCG_GENERAL_CAUSE") + ylab("Acres") +
+  xlab("WILDFIRE CAUSE") + ylab("Number of Acres Burned per Fire") +
   theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
 \newpage
 
 Title 6
 ------------------------------------------
-```{r fig.width=12, fig.height=8, fig.cap="US Wildfres, 1992-2018. The spectrum from white to darkred indicates more wildfires in that state", out.width='100%', out.height='100%', echo=TRUE, warning=FALSE}
+```{r fig.width=12, fig.height=8, fig.cap="US Wildfres, 1992-2018. The spectrum from white to darkred indicates more wildfires in that state", out.width='110%', out.height='110%', echo=TRUE, warning=FALSE}
 fires_6 <- as.data.frame(fires)
 fires_6 <- fires_6 %>%
   group_by(STATE) %>%
-  summarize(total = n()) %>%
+  summarize(total = sum(FIRE_SIZE)/27) %>%
   na.omit()
 fires_6 <- as.data.frame(fires_6)
 colnames(fires_6)[1] = "state"
-plot_usmap(data = fires_6, values = "total", color = "red", labels = TRUE) + 
+plot_usmap(data = fires_6, values = "total", color = "darkred", exclude = c("AK"), labels = TRUE) + 
   scale_fill_continuous(low = "white", high = "darkred", 
-                        name = "Number of fires", label = scales::comma) + 
+                        name = "Acres Burned per Year", label = scales::comma) + 
   theme(legend.position = "right",
         legend.title = element_text(size=16), 
         legend.text = element_text(size=18),
@@ -313,12 +323,12 @@ fires_7 <- as.data.frame(fires)
 fires_7 <- fires_7 %>%
   filter(STATE == 'CA') %>%
   group_by(FIPS_CODE) %>%
-  summarize(total = n()) %>%
+  summarize(total = sum(FIRE_SIZE)/27) %>%
   na.omit()
 fires_7 <- as.data.frame(fires_7)
 colnames(fires_7)[1] = "fips"
-plot_usmap(data = fires_7, values = "total", "counties", include = c("CA"), labels = TRUE, size = 0.4) +
-  scale_fill_continuous(low = "white", high = "darkred", name = "Number of fires", label = scales::comma) +
+plot_usmap(data = fires_7, values = "total", "counties", include = c("CA"), labels = FALSE, size = 0.4) +
+  scale_fill_continuous(low = "white", high = "darkred", name = "Acres Burned per Year", label = scales::comma) +
   theme(
         legend.position = "right",
         legend.title = element_text(size=16), 
@@ -329,8 +339,10 @@ plot_usmap(data = fires_7, values = "total", "counties", include = c("CA"), labe
 ```
 \newpage
 
-Problems Tackled and Conclusion
+Conclusion and Sources of Bias
 ====================================
+
+Work space link: https://github.com/Firewatch-DTSC5301/wildfire  
 
 \newpage
 
