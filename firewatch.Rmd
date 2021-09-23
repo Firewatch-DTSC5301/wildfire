@@ -250,7 +250,7 @@ plot_usmap(data = fires_6, values = "total",
         legend.text = element_text(size=16),
         plot.caption = element_text(size=20))
 ```
-We plot a U.S. map along with the acres burned per year. The Western U.S. is relatively riskier for wildfires such as California, Idaho, and Texas. Another findings for this graph is that Alaska state has the most Acres burned per year, but it is not risky due to the limited population living there.   
+We plot a U.S. map along with the acres burned per year and realise that the Western U.S. states like California, Idaho, and Texas are more prone to wildfires than the states present in the East. Another finding for this graph is that, Alaska has the most acres burned per year and is still not considered a threat due to its limited population.   
 
 
 CA Counties with the Most Wildfire Activity
@@ -273,7 +273,7 @@ plot_usmap(data = fires_7, values = "total", "counties",
         plot.caption = element_text(size=22))
 ```
 
-Then we decide to focus on the second most Acres burned per year - California. From the County wise of California, we can clearly see the north and south area are at most risk for wildfire. The top three risky counties are Siskiyou (North), Ventura and San Diego (South).  
+Then we decide to focus on the second most Acres burned per year - California. From the County wise of California, we can clearly see the north and south area are at most risk for wildfire. In the north, Siskiyou and Ventura counties were more affected and one of the reason for this is draught and hgih temperatures in the state. San Diego and Riverside were affected the most in the south due to the Sant Ana winds from the Mojave deserts.  
 
 \newpage
 
