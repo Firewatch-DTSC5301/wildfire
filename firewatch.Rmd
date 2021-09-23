@@ -1,206 +1,436 @@
 ---
-title: "Firewatch"
-author: "Tittiwat Tonburinthip"
-date: "9/3/2021"
+title: "Wildfire Analysis in U.S."
+author: |
+  | Xingyu Chen
+  | Kaitlyn McGrew
+  | Tittiwat Tonburinthip
+  | Kexin Yu
+  | Thejas Kiran
+date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
-  pdf_document: default
-  html_document: default
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+    toc_depth: 2
+    df_print: kable
+    highlight: tango
+subtitle: Data Science as a Field - CU Boulder
+fontsize: 12pt
+geometry: margin=1in
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+\newpage  
+\tableofcontents  
+\listoffigures  
+\newpage
+
+Introduction
+==================
+```{r library dependency, message=FALSE, warning=FALSE, include=FALSE}
+library(RSQLite)
 library(tidyverse)
-library(magrittr)
-library(dplyr)
-library(ggplot2)
+library(dbplyr)
 library(lubridate)
+library(data.table)
+library(scales)
 library(usmap)
-library(grid)
-library("scales")
+library(kableExtra)
+library(png)
 ```
 
-Retrieve the data from SQLLite
-
-```{r Retrieve data from SQLlite}
-con <- dbConnect(drv=RSQLite::SQLite(), dbname="FPA_FOD_20210617.sqlite")
-
-## list all tables
-tables <- dbListTables(con)
-
-## exclude sqlite_sequence (contains table information)
-tables <- tables[tables != "sqlite_sequence"]
-
-lDataFrames <- vector("list", length=length(tables))
-
-## create a data.frame for each table
-for (i in seq(along=tables)) {
-  lDataFrames[[i]] <- dbGetQuery(conn=con, statement=paste("SELECT * FROM '", tables[[i]], "'", sep=""))
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(fig.align='center', message=FALSE, cache=TRUE)
+output <- opts_knit$get("rmarkdown.pandoc.to")
+if(!is.null(output)) {
+  if(output=="html") opts_chunk$set(out.width = '400px') else
+    opts_chunk$set(out.width='.6\\linewidth')
 }
 ```
 
-Store dataframe in fire and place
+Motivation
+------------------------------------------
 
-```{r store_data, echo=FALSE}
-fire=as_tibble(lDataFrames[[1]])
-View(fire)
-place=as_tibble(lDataFrames[[2]])
-View(place)
-latitude=read_csv('Latitude1.csv')
-View(latitude)
+![Colorado's Air Quality is Pretty Bad Today and Will Get Worse](motivation.png){#id1 .class width="70%" height="70%"}    
+
+Wildfires, like many other natural disasters, demand everyones' attention. From being a direct threat to the constant reminder of a smoke caused haze. The smoke from the California wildfires in 2021 has massively impacted the air quality of Colorado State.   
+
+The noticeable air pollution this year reached certain levels that the state government recommended active children and adults reduce prolonged or heavy outdoor activities. This impact helped inspire this report.    
+
+The general motivation behind this project is to understand the history of wildfires in the US, see how they've changed over time and understand when and where they are most severe. The following questions are what this report will specifically try to answer.
+
+1. Have the number of wildfires increased over time? Have the fires that occur become more severe?
+2. During which time of the year is there the most wildfire activity?
+3. Which states have the most wildfire activity? Of the top state, which counties had the most wildfires activity?
+
+Here is the Work space link: https://github.com/Firewatch-DTSC5301/wildfire
+
+\newpage 
+
+Design of Data and Methodology  
+====================================
+
+Data Resource and Explanation of Variables 
+------------------------------------------
+The dataset used for this report was found via the US Department of Agriculture. It provides information on 2,166,753 wildfires in the U.S. from 1992-2018, with a variety of information including spacial, cause, size, discovery/containment dates and different classifications.  
+
+Thanks to [**U.S. DEPARTMENT OF AGRICULTURE**](https://www.fs.usda.gov/rds/archive/Catalog/RDS-2013-0009.5) for providing the dataset.
+```{r Getting dataset, echo=TRUE, warning=FALSE}
+##Read the dataset
+# create db connection
+conn <- dbConnect(SQLite(), 'FPA_FOD_20210617.sqlite')
+# pull the fires table into RAM
+fires <- tbl(conn, "Fires") %>% collect()
+# disconnect from db
+dbDisconnect(conn)
+# select the column we need for this project
+fires <- fires[,c('FIRE_NAME', 'FIRE_YEAR', 'DISCOVERY_DATE', 
+                  'NWCG_CAUSE_CLASSIFICATION', 
+                  'NWCG_GENERAL_CAUSE', 'FIRE_SIZE',
+                  'FIRE_SIZE_CLASS', 'STATE', 'FIPS_CODE')]
 ```
 
-CONT_DATE and CONT_DOY have a lot of NA, but it's the same value as DISCOVERY_DATE, DISCOVERY_DOY
-```{r query, echo=FALSE}
-fire_clean<-fire %>%
- select ( NWCG_REPORTING_UNIT_ID, FIRE_YEAR,DISCOVERY_DATE, DISCOVERY_DOY, NWCG_CAUSE_CLASSIFICATION, NWCG_GENERAL_CAUSE, FIRE_SIZE, FIRE_SIZE_CLASS, LATITUDE, LONGITUDE, STATE)%>%
-  mutate(DISCOVERY_DATE=parse_date(DISCOVERY_DATE, format="%m/%d/%Y %H:%M"),
-         FIRE_YEAR=as.character(FIRE_YEAR))
-
+```{r description for variable, echo=TRUE, warning=FALSE}
+## Description for attributes
+# get column names and rename
+fire_df_colname <- matrix(colnames(fires), ncol = 1)
+colnames(fire_df_colname)[1] <- "Related-Variable"
+# cbind the description for variable
+fire_df_colname <- 
+  cbind(fire_df_colname, 
+  Description=
+  c('Name of the incident from the fire report', 
+  'Date of Year on that fire',
+  'Date on which the fire was discovered or confirmed to exist',
+  'Code for the (statistical) cause of the fire', 
+  'Description of the (statistical) cause of the fire.', 
+  'Estimate of acres within the final perimeter of the fire.', 
+  'Code for fire size based on the number of acres within the final fire perimeter expenditures (A=greater than 0 but less than or equal to 0.25 acres, B=0.26-9.9 acres, C=10.0-99.9 acres, D=100-299 acres, E=300 to 999 acres, F=1000 to 4999 acres, and G=5000+ acres).', 
+  'Two-letter alphabetic code for the state in which the fire burned (or originated), based on the nominal designation in the fire report.', 
+  'Numbers which uniquely identify geographic areas.'))
+# kable related variable
+kbl(as.data.frame(fire_df_colname), booktabs = T, longtable = T, 
+    caption = "The Variables of Interest in the Dataset") %>%
+  kable_styling(full_width = T) %>%
+  column_spec(1, color = "red") %>%
+  column_spec(2, width = "25em")
 ```
 
-a= store the rows that have NA. It's only have one row that NWCG_CAUSE_CLASSIFICATION== NA, so delete it and store in fire_clean
-```{r clean_data, echo=FALSE}
-a=fire_clean[rowSums(is.na(fire_clean))>0,]
-#View(a)
+The data for this project was obtained via the websites mentioned above and compiled into one sqlite file to be read into R. There are some missing some values and certain information. The na.omit function was used to remove empty rows from the dataset and the usmap library was used to filter the state name column of the dataset.   
 
-fire_clean=na.omit(fire_clean)
+The description for each variable inside the dataset can be found in the [**Kaggle** dataset website](https://www.kaggle.com/rtatman/188-million-us-wildfires). This website provides the yearly wildfire data for the United States. Although it is an out-of-date dataset the description for the variable still useful for our dataset. This website provides reshaped data to some extent which is originally from the [national Fire Program Analysis (**FPA**)](https://www.usda.gov/).  
 
+\newpage 
+
+Preparing the Data 
+------------------------------------------
+The following was done to prepare the dataset for analysis:   
+
+1. Drill in on States/Counties impacted most by wildfires using the "include" parameter in the plot_usmap() function.  
+
+2. Remove rows missing information on fire size and fire cause.    
+
+3. Due to different categories for the dataset, only a subset of the columns were used in order to not duplicate the information.  
+
+4. Format date information to a more usable form.    
+
+5. Create a table that provides more information about each variable in the dataset.  
+
+
+R Library Foundations of the Project
+------------------------------------------
+This project may be imported into the RStudio environment and compiled by researchers wishing to reproduce this work for newest plot with future data sets, and having new findings or discussions from that.    
+
+> The Core of Statistics were done using R 4.1.0 (R Core Team, 2021-05-18), the ggplot2 (v3.3.5; RStudio Team, 2021-06-25), and the knitr (v1.34; Yihui, 2021-09-08) packages.
+
+**ggplot2** Package: this package has been used for creating graphics such as box plot, line plot, bar plot, and density plot from the reshaped datasets.
+
+**knitr** Package: this report is constructed to have reproducibility that it can regenerate the plot based on the latest dataset contains yearly report in the future, using literate programming techniques for dynamic report generation in R.    
+
+> The Initial Scenarios package is usmap 0.5.2 (Paolo Di Lorenzo, 2021-01-21).
+
+*usmap** Package: we use plot_usmap(based on ggplot object) to plot the US map. The map data frames include Alaska and Hawaii placed to the bottom left.
+
+> The Most Frequently Used package is dplyr (v1.0.7; RStudio Team, 2021-06-18).
+
+**dplyr** Package: many functions were used to reshape the dataset and working with data frames.
+
+Note: There were other packages used for limited purposes, they are not listed here. 
+
+\newpage
+
+
+Exploration
+====================================
+
+Number of Fires Over Time
+------------------------------------------
+
+```{r Wildfire Frequency, out.width='97%', out.height='97%', echo=TRUE, message=FALSE, warning=FALSE}
+fires_date <- fires %>% 
+  select(FIRE_YEAR, FIRE_SIZE) %>% 
+  group_by(FIRE_YEAR) %>% 
+  summarise(Total_Fires = n(), Burn_Size = sum(FIRE_SIZE))
+fires_date %>% ggplot(aes(x= FIRE_YEAR)) + 
+  geom_col(aes(y = Total_Fires), fill = "darkred") + 
+  stat_smooth(aes(method = "lm", y = Total_Fires), 
+              color = "darkblue", fill = "royalblue") +
+  scale_x_continuous(name = " Year", 
+                     breaks = round(seq(min(fires_date$FIRE_YEAR), 
+                                        max(fires_date$FIRE_YEAR), by = 2),1)) +
+  scale_y_continuous(name = "# of Fires", labels = scales::comma) + 
+  ggtitle("Total Fires per Year") + theme_bw()
 ```
 
-place_1 has a mutate column named NWCG_REPORTING_UNIT_ID.
-Then, LEFT JOIN with fire_clean_1
-```{r leftjoin, echo=FALSE}
-place_1<-place%>%
-  mutate(NWCG_REPORTING_UNIT_ID=UnitId)
+Observing the first plot, *Total Fires Per Year*, it shows the number of fires has not increased. In fact the data shows there was a peak around 2006 after which the number of fires decreased. We apply a linear regression line to the graph but it does not show the increasing trend.   
 
-fire_clean_1<-fire_clean%>%
-  left_join(place_1, by='NWCG_REPORTING_UNIT_ID')
-#View(fire_clean_1)
-fire_clean_1=as_tibble(fire_clean_1)
-#View(fire_clean_1)
-```
-#Summary
-```{r summary, echo=FALSE}
-summary(fire_clean_1)
-```
+\newpage
 
-Prepare data for sparkline
+Fire Severity Over Time and Model
+------------------------------------------
 
-```{r trend_by_state, echo=FALSE}
-fire_clean_2<-fire_clean_1%>%
-  filter(Country=="US", DISCOVERY_DATE>='2016-01-01')%>%
-  group_by(STATE, DISCOVERY_DATE)%>%
-  summarise(count=n())%>%
-  mutate(cum=cumsum(count))%>%
-  arrange(STATE, DISCOVERY_DATE)
-
-#View(fire_clean_2)
-#View(fire_clean_1)
-```
-plot- Sparkline_cumulative fire in 5 years [start:01/01/2016]
-
-```{r plot}
-g <- fire_clean_2 %>% 
-  ggplot(aes(x = DISCOVERY_DATE, y = cum))+
-  facet_wrap(~ STATE, ncol = 9, scales ="free_y") +
-  geom_line()+ theme(axis.ticks.y = element_blank(), axis.text.y = element_blank())+
-  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())+theme(panel.background = element_rect(fill = "lightblue",
-                                colour = "lightblue",
-                                size = 0.5, linetype = "solid"),
-  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
-                                colour = "white"), 
-  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',colour = "white"))+ylab('cumulative frequency of fire')
-g
-
-
-library(ggh4x)
-g + force_panelsizes(rows = unit(0.3, "in"),
-                     cols = unit(0.5, "in"))
-g
+```{r Wildfire Severity,out.width='96%', out.height='96%', echo=TRUE, message=FALSE, warning=FALSE}
+simple.fit = lm(FIRE_YEAR~Burn_Size, data=fires_date)
+summary(simple.fit)
+fires_date %>% ggplot(aes(x= FIRE_YEAR)) + 
+  geom_line(aes(y = Burn_Size),size = 1, color = "darkred") + 
+  stat_smooth(aes(method = "lm", y = Burn_Size), 
+              fill = "royalblue", color = "darkblue") +  
+  scale_x_continuous(name = " Year", 
+                     breaks = round(seq(min(fires_date$FIRE_YEAR), 
+                                        max(fires_date$FIRE_YEAR), by = 2),1)) +
+  scale_y_continuous(name = "Acres", labels = scales::comma) + 
+  ggtitle("Total Acres Burned per Year") + theme_bw()
 ```
 
-```{r bar_by_size, echo=FALSE}
-fire_clean_3<-fire_clean_1%>%
-  filter(Country=="US", DISCOVERY_DATE>='2013-01-01')%>%
-  group_by(FIRE_YEAR, FIRE_SIZE_CLASS)%>%
-  summarise(count=n())%>%
-  mutate(cum=cumsum(count))%>%
-  arrange(FIRE_YEAR)
 
-View(fire_clean_1)
+In the second plot, *Total Acres Burned per Year*, shows that the number of acres burned per year, or the severity of the fires that year, has steadily increased. We have created a linear regression model for the relationship between Fire year and Burned Size, and attach the line into the plot.   
+
+\newpage
+
+Time Period with the Most Wildfire Activity
+------------------------------------------
+
+```{r average wildfire count by Day of Year, fig.cap="Average Number of Acres Burned by Day of Year",  out.width='98%', out.height='98%', echo=TRUE, warning=FALSE}
+fires_1 <- as.data.frame(fires)
+fires_1$DISCOVERY_DATE<-as.Date(fires_1$DISCOVERY_DATE, format = "%m/%d/%Y")
+fires_1 <- fires_1 %>%
+  mutate(day = format(DISCOVERY_DATE, "%d"),
+         month = format(DISCOVERY_DATE, "%m"), 
+         year = format(DISCOVERY_DATE, "%Y")) %>%
+  group_by(month, day) %>%
+  summarise(total = sum(FIRE_SIZE)/27) %>%
+  mutate(date = make_date(month = month, day = day))
+ggplot() + geom_line(aes(x = date, y = total), fires_1, color = 'darkred') +
+  scale_x_date(date_breaks= "1 month", date_labels = "%b") +
+  xlab("Day of Year") + ylab("Average Number of Acres Burned") +
+  theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
 
-stack bar
-```{r barplot, echo=FALSE}
-ggplot(fire_clean_3, aes(fill=FIRE_SIZE_CLASS, y=count, x=FIRE_YEAR))+geom_bar(position="dodge", stat="identity")+theme_minimal()
+The graph was plotted between the average number of Acres Burned and day of year from 1992 to 2018. According to the graph, there was a peak during June to September every year. The reasons to support data are hot temperature and people start travelling in summer. The graph is similar and same peak when limited the data from 2013 to 2018.   
+
+\newpage
+
+States with the Most Wildfire Activity
+------------------------------------------
+```{r fig.width=12, fig.height=8, fig.cap="US Wildfres, 1992-2018. The spectrum from white to darkred indicates worse severity of wildfires in that State", out.width='110%', out.height='110%', echo=TRUE, warning=FALSE}
+fires_6 <- as.data.frame(fires)
+fires_6 <- fires_6 %>%
+  group_by(STATE) %>%
+  summarize(total = sum(FIRE_SIZE)/27) %>%
+  na.omit()
+fires_6 <- as.data.frame(fires_6)
+colnames(fires_6)[1] = "state"
+plot_usmap(data = fires_6, values = "total", 
+           color = "darkred", exclude = c("AK"), labels = TRUE) + 
+  scale_fill_continuous(low = "white", high = "darkred", 
+                        name = "Acres Burned per Year", label = scales::comma) + 
+  theme(legend.position = "right",
+        legend.title = element_text(size=14), 
+        legend.text = element_text(size=16),
+        plot.caption = element_text(size=20))
+```
+We plot a U.S. map along with the acres burned per year. The Western U.S. is relatively riskier for wildfires such as California, Idaho, and Texas. Another findings for this graph is that Alaska state has the most Acres burned per year, but it is not risky due to the limited population living there.   
 
 
+CA Counties with the Most Wildfire Activity
+------------------------------------------
+```{r fig.width=12, fig.height=8, fig.cap="US Wildfires in CA, 1992-2018. The spectrum from white to darkred indicates worse severity of wildfires in that county", out.width='50%', out.height='50%', echo=TRUE, warning=FALSE}
+fires_7 <- as.data.frame(fires)
+fires_7 <- fires_7 %>%
+  filter(STATE == 'CA') %>%
+  group_by(FIPS_CODE) %>%
+  summarize(total = sum(FIRE_SIZE)/27) %>% na.omit()
+fires_7 <- as.data.frame(fires_7)
+colnames(fires_7)[1] = "fips"
+plot_usmap(data = fires_7, values = "total", "counties", 
+           include = c("CA"), labels = FALSE, size = 0.4) +
+  scale_fill_continuous(low = "white", high = "darkred",
+                        name = "Acres Burned per Year", label = scales::comma) +
+  theme(legend.position = "right",
+        legend.title = element_text(size=16), 
+        legend.text = element_text(size=18),
+        plot.caption = element_text(size=22))
 ```
 
-```{r prepare_data, echo=FALSE}
-fire_clean_4<-fire_clean_1%>%
-  filter(Country=="US", DISCOVERY_DATE>='2013-01-01')%>%
-  mutate(month_date=factor(months(DISCOVERY_DATE, abbreviate = TRUE), levels = month.abb))%>%
-  group_by(month_date)%>%
-  summarise(count=n())
+Then we decide to focus on the second most Acres burned per year - California. From the County wise of California, we can clearly see the north and south area are at most risk for wildfire. The top three risky counties are Siskiyou (North), Ventura and San Diego (South).  
 
-  
-  
+\newpage
 
+Conclusion and Sources of Bias
+====================================
+We have several findings above and here is the conclusion:    
 
-#View(fire_clean_4)
+1. The first plots is the number of wildfires has not increased during the time frame of the data set.   
+
+2. The total number of acres burned per year has steadily increased, indicating the severity of the fires has gotten worse over time.   
+
+3. From June to September is the peak of wildfire all year round. The reasons to support data are hot temperature and people start travelling in summer.   
+
+4. Western U.S. is relatively riskier for wildfires such as California, Idaho, and Texas.    
+
+5. Alaska has the most Acres burned, but it is not risky due to the limited population living there.     
+
+However, we do notice the possible source of bias identified below, which could be influencing the findings in this section:   
+
+1. It's unclear if the method of counting wildfires has changed over the years. It's possible what used to count as a wildfire does not, or in other terms, fires that occurred in the 90's might not count as a wildfire now, and would not be included in the data.    
+
+2. It's unclear how the acres burned per fire is tracked and recorded. Over the years how they estimate the total acres may have changed as technologies (such as satellite imaging) have improved.  
+
+3. There is missing data, not specified data and undetermined data which lead to the average number of each cause inaccurate.   
+
+4. There are some wildfires do not be found by human, so they cannot be record, and then lead to the data do not accurate.  
+
+5. It is not easy to record all of wildfires which fire size is small. Because small fires are easy to put off, such as weathers like rains, which can put off the fire unconsciously.   
+
+\newpage
+
+Further Exploration
+====================================
+
+There are other findings we generated from our data set but not directly answer our initial problem statement. However, some of them are quite useful and help us to be familiar with the data set we are working on.  
+
+Wildfires by Cause Classification
+------------------------------------------
+
+```{r Number of wildfires by cause, fig.cap="Number of US Wildfires by Cause Type. ", out.width='79%', out.height='79%', echo=TRUE, warning=FALSE}
+fires_3 <- as.data.frame(fires)
+fires_3 <- fires_3 %>%
+  group_by(NWCG_CAUSE_CLASSIFICATION) %>%
+  summarize(total = n()) %>%
+  na.omit() %>%
+  arrange(desc(total))
+ggplot(data = fires_3) + 
+  geom_bar(aes(x = "", y = total, fill = NWCG_CAUSE_CLASSIFICATION), stat = "identity") +   
+  geom_text(aes(x = "", y = total, label = paste0(round(total / sum(total) * 100, 1), "%"))) +
+  coord_polar(theta = "y") +
+  theme_void() +
+  theme(legend.position = "right",
+        legend.title = element_text(size=10), 
+        legend.text = element_text(size=8))
 ```
+It is a plot to show the relationship between the number of wildfires and the broad reasons of these wildfires. We notice that the most common reason to cause wildfires is human, there are more than three quarters of wildfires are caused by human. And natural causes only account for 14.4%.  
 
-Which month do forest fires occur mostly? [IN US]
-```{r bar_month, echo=FALSE}
-ggplot(fire_clean_4, aes(y=count, x=month_date))+geom_bar(position="dodge", stat="identity")+theme_minimal()+geom_text(aes(label=count), vjust=1.6, color="white",position = position_dodge(0.9), size=3.5)
-#View(fire_clean_3)
+\newpage
+Wildfire by Size Class
+------------------------------------------
+```{r Number of Wildfires by Size Class, fig.cap="Number of Wildfires by Size Class", out.width='99%', out.height='99%', echo=TRUE, warning=FALSE}
+fires_2 <- as.data.frame(fires)
+size_classes <- c('A' = '0-0.25', 'B' = '0.26-9.9','C' = '10.0-99.9', 'D' = '100-299',
+                  'E' = '300-999', 'F' = '1000-4999','G' = '5000+')
+fires_2 <- fires_2 %>%
+  group_by(FIRE_SIZE_CLASS) %>%
+  summarize(total = n()/27) %>%
+  mutate(FIRE_SIZE_CLASS = size_classes[FIRE_SIZE_CLASS])
+ggplot(data = fires_2, aes(x=FIRE_SIZE_CLASS, y = total, fill =FIRE_SIZE_CLASS)) + 
+  geom_bar(stat = "identity") + scale_fill_brewer(palette = "Reds") +
+  xlab("Number of Acres Burned") + ylab("Number of wildfires per Year") +
+  geom_text(label = paste0(round(fires_2$total/sum(fires_2$total)*100, 1), "%")) +
+  theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
+According to this plot, we can see that there are nearly 80000 wildfires’ fire size range from 0 to 99.9 acres, the proportion of these wildfires is about 97.2 percent of the total. Except the number of wildfires in fire size of 0 to 0.25 acres, the greater the number of acres burned per fires, the fewer the number of wildfires per year. We can clearly see that there are only a thousand or even hundreds of wildfires occurred which size are greater than 100 acres.   
 
-prepare data for the map chart
-```{r data_map_chart, echo=FALSE}
-fire_clean_5<-fire_clean_1%>%
-  filter(Country=="US", DISCOVERY_DATE>='2013-01-01')%>%
-  left_join(latitude, by=c('STATE'))%>%
-  group_by(STATE, latitude, longitude)%>%
-  summarise(count=n())%>%
-  ungroup()
-#View(fire_clean_5)
+\newpage
+
+
+
+
+Wildfires by General Cause
+------------------------------------------
+```{r relationship between fire size and cause, fig.cap="Average Wildfire Size by Cause", out.width='96%', out.height='96%', echo=TRUE, warning=FALSE}
+fires_5 <- as.data.frame(fires)
+fires_5 <- fires_5 %>%
+  group_by(NWCG_GENERAL_CAUSE) %>%
+  summarize(mean_size = mean(FIRE_SIZE, na.rm = TRUE)) %>%
+  na.omit() %>%
+  arrange(desc(mean_size))
+ggplot(data = fires_5) + 
+  geom_bar(aes(x = reorder(NWCG_GENERAL_CAUSE, mean_size), y = mean_size), stat = "identity", fill = 'darkred') + 
+  coord_flip() +
+  xlab("WILDFIRE CAUSE") + ylab("Number of Acres Burned per Fire") +
+  theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
+This is the plot shows the relationship between the number of acres burned per fire and the cause of wildfire. We notice that natural and the use of firearms and explosives are the two reasons that leads to the large number of acres burned per fire, natural causes over 300 acres burned per fire and the fire size of the use of firearms and explosives is about 270 acres.
 
-```{r data_map_chart, echo=FALSE}
-fire_clean_5<-fire_clean_1%>%
-  filter(Country=="US", DISCOVERY_DATE>='2013-01-01')%>%
-  left_join(latitude, by=c('STATE'))%>%
-  group_by(STATE, latitude, longitude)%>%
-  summarise(count=n())%>%
-  ungroup()
-#View(fire_clean_5)
-```
+We can make a conclusion that except the natural cause and the use of firearms and explosives, for other reasons, it is rare for them to lead to a fire which burned about three hundred acres.
 
-```{r map_chart, echo=FALSE}
-fire_clean_5%>%
-  filter(latitude < 50, latitude > 20, longitude > -150, longitude < -50) %>%
-  ggplot(aes(longitude, latitude)) +
-    borders("state") + 
-    geom_point(aes(color = count, 
-                   size = count)) +coord_quickmap()
+\newpage
 
-```
 
-```{r data_cause, echo=FALSE}
-fire_clean_6<-fire_clean_1%>%
-  filter(Country=="US", DISCOVERY_DATE>='2013-01-01')%>%
-  left_join(latitude, by=c('STATE'))%>%
-  group_by(NWCG_GENERAL_CAUSE)%>%
-  summarise(count=n())%>%
-  ungroup()
-View(fire_clean_6)
-```
+Possible Extensions
+====================================
 
-```{r pie, echo=FALSE}
-ggplot(fire_clean_6, aes(x="", y=count, fill=NWCG_GENERAL_CAUSE)) +
-  geom_bar(stat="identity", width=1) +
-  coord_polar("y", start=0)+theme_void()+ geom_text(aes(y = count/3 + c(0, cumsum(count)[-length(count)]), 
-            label = percent(count/100)), size=3)
-```
+From the information gleaned in further exploration section, it's clear this dataset has much more that can be explored. Extensions of this report include analyzing wildfire causes and how they relate to locations (are certain causes more common in certain parts of the U.S?) as well as building interactive maps, that could show how fire severity has changed over time across the U.S.
+
+Another future extension (if someone in community want to develop more features and write discussion based on it) is that we wish to have a interactive map using the Shiny application, Google APIs and the D3.js, so that users can click on the state name to view more details about wildfires in that state, such as fire size and fire cause along with web host server for data set using Hadoop and SQL.  
+
+The most important features we want to add to our project is the model. Due to time limits and other technique unfamiliar, we only have linear regression model for our project. We definitely want to add more ML method to predict the fire size/location/cause.  
+
+Related Information and Inspiration 
+====================================
+The following provided some inspiration for this project:
+
+![Wildland Fire Summaries for current national statistics](motivation2.png){#id2 .class width="51%" height="51%"}  
+
+[**Figure 2**](https://www.nifc.gov/fire-information/statistics) from National Interagency Fire Center on current wildfire statistics. 
+
+
+The [**CAL FIRE**](https://www.fire.ca.gov/) website is powered by California Department of Forestry and Fire Protection, under the direction of the state Board of Forestry and Fire Protection. This interactive web tool shows that details wildfire information.   annually.
+
+\newpage
+
+References
+====================================
+[1] Colorado's Air Quality is Pretty Bad Today And Will Get Worse             
+   https://www.cpr.org/2021/08/05/colorado-air-quality-bad-today-will-get-worse/ 
+
+[2] California WildFires (2013-2020)  - Kaggle Data website,  
+    https://www.kaggle.com/ananthu017/california-wildfire-incidents-20132020
+
+[3] Spatial wildfire occurrence data for the United States, 1992-2018  - U.S. Department of Agriculture,  
+    https://www.fs.usda.gov/rds/archive/Catalog/RDS-2013-0009.5
+    
+[4] R Core Team, R: A Language and Environment for Statistical Computing, R Foundation for Statistical Computing, Vienna, Austria,  
+    http://www.R-project.org/, 2021
+
+[5] Yihui Xie knitr: A general-purpose package for dynamic report generation in R,  
+    http://yihui.name/knitr/, 2021
+    
+[6] Different Ways of Plotting U.S. Map in R,  
+   https://jtr13.github.io/cc19/different-ways-of-plotting-u-s-map-in-r.html#using-usmap-package, 2021
+    
+[7] Census Regions and Divisions of the United States - U.S. Census Bureau,  
+    https://www2.census.gov/geo/pdfs/maps-data/maps/reference/us_regdiv.pdf, 2021
+    
+[8] Easy way to mix multiple graphs on the same page - ggplot2 package,  
+    http://www.sthda.com/english/articles/24-ggpubr-publication-ready-plots/81-ggplot2-easy-way-to-mix-multiple-graphs-on-the-same-page/    
+
+[9] 1.88 Million US Wildfires - Kaggle Data website,  
+    https://www.kaggle.com/rtatman/188-million-us-wildfires
+    
+[10] Figures, Tables, Captions - R Markdown for Scientists,  
+    https://rmd4sci.njtierney.com/figures-tables-captions-.html, 2021
+
+[11] Yang Liu ggplot US state heatmap - usmap package,  
+    https://liuyanguu.github.io/post/2020/06/12/ggplot-us-state-and-china-province-heatmap/, 2021
+
