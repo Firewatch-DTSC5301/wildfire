@@ -55,15 +55,15 @@ Motivation
 
 Wildfires, like many other natural disasters, demand everyones' attention. From being a direct threat to the constant reminder of a smoke caused haze. The smoke from the California wildfires in 2021 has massively impacted the air quality of Colorado State.   
 
-The noticeable air pollution this year reached certain levels that the state government recommended active children and adults reduce prolonged or heavy outdoor activities. This impact helped inspire this report.    
+The noticeable air pollution reached such levels that the state government recommended active children and adults reduce prolonged or heavy outdoor activities. This impact helped inspire this report.    
 
-The general motivation behind this project is to understand the history of wildfires in the US, see how they've changed over time and understand when and where they are most severe. The following questions are what this report will specifically try to answer.
+The general motivation behind this project is to understand the history of wildfires in the U.S., see how they've changed over time and understand when and where they are most severe. The following questions are what this report will specifically try to answer.
 
 1. Have the number of wildfires increased over time? Have the fires that occur become more severe?
 2. During which time of the year is there the most wildfire activity?
 3. Which states have the most wildfire activity? Of the top state, which counties had the most wildfires activity?
 
-Here is the Work space link: https://github.com/Firewatch-DTSC5301/wildfire
+Here is the work space link: https://github.com/Firewatch-DTSC5301/wildfire
 
 \newpage 
 
@@ -182,7 +182,7 @@ fires_date %>% ggplot(aes(x= FIRE_YEAR)) +
   ggtitle("Total Fires per Year") + theme_bw()
 ```
 
-Observing the first plot, *Total Fires Per Year*, it shows the number of fires has not increased. In fact the data shows there was a peak around 2006 after which the number of fires decreased. We apply a linear regression line to the graph but it does not show the increasing trend.   
+Observing the first plot, *Total Fires Per Year*, it shows the number of fires has not increased. In fact the data shows there was a peak around 2006 after which the number of fires decreased. A linear regression model was applied further confirming that there is not a relationship between year and fire count.
 
 \newpage
 
@@ -204,7 +204,7 @@ fires_date %>% ggplot(aes(x= FIRE_YEAR)) +
 ```
 
 
-In the second plot, *Total Acres Burned per Year*, shows that the number of acres burned per year, or the severity of the fires that year, has steadily increased. We have created a linear regression model for the relationship between Fire year and Burned Size, and attach the line into the plot.   
+In the second plot, *Total Acres Burned per Year*, the number of acres burned per year or in other terms, the severity of the fires. The linear regression model for the relationship shows a positive correlation between year and total acres burned. 
 
 \newpage
 
@@ -227,7 +227,7 @@ ggplot() + geom_line(aes(x = date, y = total), fires_1, color = 'darkred') +
   theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
 
-The graph was plotted between the average number of Acres Burned and day of year from 1992 to 2018. According to the graph, there was a peak during June to September every year. The reasons to support data are hot temperature and people start travelling in summer. The graph is similar and same peak when limited the data from 2013 to 2018.   
+The graph was plotted between the average number of acres burned and day of year from 1992 to 2018. The graph shows there is a peak during June to September every year. Possible reasons for this are hot temperature and low rainfall during that part of the year. The graph is similar when limiting the data to 2013 to 2018, indicating that this correlation has not changed over time.  
 
 \newpage
 
@@ -250,7 +250,7 @@ plot_usmap(data = fires_6, values = "total",
         legend.text = element_text(size=16),
         plot.caption = element_text(size=20))
 ```
-We plot a U.S. map along with the acres burned per year and realise that the Western U.S. states like California, Idaho, and Texas are more prone to wildfires than the states present in the East. Another finding for this graph is that, Alaska has the most acres burned per year and is still not considered a threat due to its limited population.   
+The heat map of total acres burned of the U.S. show the western states like California, Idaho, and Texas have more severe wildfires than the eastern states. When Alaska is included in the calculations it has the most acres burned than any other state. However, due to the low population of this state, wildfires are allowed to burn with minimal intervention, so for this analysis, Alaska is excluded. This is to highlight states where wildfires are a true threat to the population.
 
 
 CA Counties with the Most Wildfire Activity
@@ -273,42 +273,24 @@ plot_usmap(data = fires_7, values = "total", "counties",
         plot.caption = element_text(size=22))
 ```
 
-Then we decide to focus on the second most Acres burned per year - California. From the County wise of California, we can clearly see the north and south area are at most risk for wildfire. In the north, Siskiyou and Ventura counties were more affected and one of the reason for this is draught and hgih temperatures in the state. San Diego and Riverside were affected the most in the south due to the Sant Ana winds from the Mojave deserts.  
+Highlighting California, the North and South counties are most at risk for wildfires. Longer periods of drought, high temperatures and high winds have caused these more severe wildfires.  
 
 \newpage
 
 Conclusion and Sources of Bias
 ====================================
-We have several findings above and here is the conclusion:    
 
-1. The first plots is the number of wildfires has not increased during the time frame of the data set.   
+Through this analysis, several conclusions can be made. First, that while the number of wildfires each year has not increased, the number of acres burned has steadily increased, indicating the severity of the wildfires has gotten worse over time. Second, the peak wildfire season is from June to September, and this season has not changed over the time frame of this dataset. Lastly, the region of the U.S. with the most severe wildfires is the West, specifically California, Idaho, and Texas when Alaska is excluded from the analysis. 
 
-2. The total number of acres burned per year has steadily increased, indicating the severity of the fires has gotten worse over time.   
+However, there are possible sources of bias which could be influencing the findings of this report. It's unclear if the method of counting wildfires has changed over the years. It's possible what used to count as a wildfire does not, or in other terms, fires that occurred in the 90's might not count as a wildfire now, and would not be included in the data. Over the years how the estimate of acres burned by wildfires may have changed as technologies (such as satellite imaging) has improved. There is also the issue of recording smaller fires, or fires that do not persist for long periods of time, those may be missed and not recorded. Finally counties and states across the U.S. may be inconsistent in their reporting, causing bias by geographic location. 
 
-3. From June to September is the peak of wildfire all year round. The reasons to support data are hot temperature and people start travelling in summer.   
-
-4. Western U.S. is relatively riskier for wildfires such as California, Idaho, and Texas.    
-
-5. Alaska has the most Acres burned, but it is not risky due to the limited population living there.     
-
-However, we do notice the possible source of bias identified below, which could be influencing the findings in this section:   
-
-1. It's unclear if the method of counting wildfires has changed over the years. It's possible what used to count as a wildfire does not, or in other terms, fires that occurred in the 90's might not count as a wildfire now, and would not be included in the data.    
-
-2. It's unclear how the acres burned per fire is tracked and recorded. Over the years how they estimate the total acres may have changed as technologies (such as satellite imaging) have improved.  
-
-3. There is missing data, not specified data and undetermined data which lead to the average number of each cause inaccurate.   
-
-4. There are some wildfires do not be found by human, so they cannot be record, and then lead to the data do not accurate.  
-
-5. It is not easy to record all of wildfires which fire size is small. Because small fires are easy to put off, such as weathers like rains, which can put off the fire unconsciously.   
 
 \newpage
 
 Further Exploration
 ====================================
 
-There are other findings we generated from our data set but not directly answer our initial problem statement. However, some of them are quite useful and help us to be familiar with the data set we are working on.  
+There are other findings generated from the dataset that did not directly relate to the initial problem statement. However, they illustrate possible extensions of this analysis and other ways this dataset could be used.
 
 Wildfires by Cause Classification
 ------------------------------------------
@@ -329,7 +311,7 @@ ggplot(data = fires_3) +
         legend.title = element_text(size=10), 
         legend.text = element_text(size=8))
 ```
-It is a plot to show the relationship between the number of wildfires and the broad reasons of these wildfires. We notice that the most common reason to cause wildfires is human, there are more than three quarters of wildfires are caused by human. And natural causes only account for 14.4%.  
+This plot details the distribution of wildfires by their general cause.
 
 \newpage
 Wildfire by Size Class
@@ -348,7 +330,7 @@ ggplot(data = fires_2, aes(x=FIRE_SIZE_CLASS, y = total, fill =FIRE_SIZE_CLASS))
   geom_text(label = paste0(round(fires_2$total/sum(fires_2$total)*100, 1), "%")) +
   theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
-According to this plot, we can see that there are nearly 80000 wildfires’ fire size range from 0 to 99.9 acres, the proportion of these wildfires is about 97.2 percent of the total. Except the number of wildfires in fire size of 0 to 0.25 acres, the greater the number of acres burned per fires, the fewer the number of wildfires per year. We can clearly see that there are only a thousand or even hundreds of wildfires occurred which size are greater than 100 acres.   
+This plot shows the distribution of wildfires by their class size, a predetermined classification based on total acres burned.
 
 \newpage
 
@@ -370,9 +352,7 @@ ggplot(data = fires_5) +
   xlab("WILDFIRE CAUSE") + ylab("Number of Acres Burned per Fire") +
   theme(plot.background = element_rect(fill = "#BFD5E3"))
 ```
-This is the plot shows the relationship between the number of acres burned per fire and the cause of wildfire. We notice that natural and the use of firearms and explosives are the two reasons that leads to the large number of acres burned per fire, natural causes over 300 acres burned per fire and the fire size of the use of firearms and explosives is about 270 acres.
-
-We can make a conclusion that except the natural cause and the use of firearms and explosives, for other reasons, it is rare for them to lead to a fire which burned about three hundred acres.
+This plot shows the relationship between cause and average wildfire size.
 
 \newpage
 
@@ -380,11 +360,9 @@ We can make a conclusion that except the natural cause and the use of firearms a
 Possible Extensions
 ====================================
 
-From the information gleaned in further exploration section, it's clear this dataset has much more that can be explored. Extensions of this report include analyzing wildfire causes and how they relate to locations (are certain causes more common in certain parts of the U.S?) as well as building interactive maps, that could show how fire severity has changed over time across the U.S.
+From the information gleaned in the further exploration section, it's clear this dataset has much more to be explored. Extensions of this report include analyzing wildfire causes and how they relate to locations (are certain causes more common in certain parts of the U.S?) as well as building interactive maps using the Shiny application. Those maps could show how fire severity has changed over time across the U.S. or data for specific states like distribution of fire size or most common cause. Finally, it would be interesting to see if it's possible to build a predictive model, that could forecast the size of future wildfires, this might be accomplished by combining this dataset with others, like daily weather data.
 
-Another future extension (if someone in community want to develop more features and write discussion based on it) is that we wish to have a interactive map using the Shiny application, Google APIs and the D3.js, so that users can click on the state name to view more details about wildfires in that state, such as fire size and fire cause along with web host server for data set using Hadoop and SQL.  
 
-The most important features we want to add to our project is the model. Due to time limits and other technique unfamiliar, we only have linear regression model for our project. We definitely want to add more ML method to predict the fire size/location/cause.  
 
 Related Information and Inspiration 
 ====================================
