@@ -1,0 +1,167 @@
+library(RSQLite)
+library(dbplyr)
+library(tidyverse)
+library(caret)
+library(rpart.plot)
+library(knitr)
+library(kableExtra)
+
+set.seed(123)
+index <- sample(c(TRUE, FALSE), nrow(fires), replace = TRUE, prob = c(0.1, 0.9))
+fires <- fires[index, ]
+
+# features to use
+features <- c('FIRE_SIZE')
+
+fires$STAT_CAUSE_DESCR <- as.factor(fires$STAT_CAUSE_DESCR)
+
+# index for train/test split
+set.seed(123)
+train_index <- sample(c(TRUE, FALSE), nrow(fires), replace = TRUE, prob = c(0.8, 0.2))
+test_index <- !train_index
+
+# Create x/y, train/test data
+x_train <- as.data.frame(fires[train_index, features])
+y_train <- fires$STAT_CAUSE_DESCR[train_index]
+
+x_test <- as.data.frame(fires[test_index, features])
+y_test <- fires$STAT_CAUSE_DESCR[test_index]
+
+
+
+# 1benchmark
+preds <- rep('Debris Burning', length(y_test))
+
+test_set_acc <- round(sum(y_test == preds)/length(preds), 4)
+print(paste(c("Accuracy:" , test_set_acc)))
+
+# 2 decision tree
+# create the training control object.
+tr_control <- trainControl(method = 'cv', number = 3)
+
+# Train the decision tree model
+set.seed(123)
+dtree <- train(x = x_train,
+               y = y_train,
+               method = 'rpart',
+               trControl = tr_control)
+               
+# make predictions using test set
+preds <- predict(dtree, newdata = x_test)
+
+# calculate accuracy on test set
+test_set_acc <- round(sum(y_test == preds)/length(preds), 4)
+print(paste(c("Accuracy:" , test_set_acc)))
+
+# 3 more features
+features <- c('FIRE_YEAR', 'FIRE_SIZE', 'DISCOVERY_DOY')
+
+x_train <- as.data.frame(fires[train_index, features])
+y_train <- fires$STAT_CAUSE_DESCR[train_index]
+
+x_test <- as.data.frame(fires[test_index, features])
+y_test <- fires$STAT_CAUSE_DESCR[test_index]
+
+set.seed(123)
+
+dtree <- train(x = x_train,
+               y = y_train,
+               method = 'rpart',
+               tuneLength = 5,
+               trControl = tr_control)
+
+preds <- predict(dtree, newdata = x_test)
+
+# calculate accuracy on test set
+test_set_acc <- sum(y_test == preds)/length(preds)
+print(paste(c("Accuracy:" , round(test_set_acc, 4))))
+
+# More feature again
+features <- c('FIRE_YEAR', 'FIRE_SIZE', 'DISCOVERY_DOY', 'LATITUDE', 'LONGITUDE')
+
+x_train <- as.data.frame(fires[train_index, features])
+y_train <- fires$STAT_CAUSE_DESCR[train_index]
+
+x_test <- as.data.frame(fires[test_index, features])
+y_test <- fires$STAT_CAUSE_DESCR[test_index]
+
+# Train the decision tree model
+set.seed(123)
+dtree <- train(x = x_train,
+               y = y_train,
+               method = 'rpart',
+               tuneLength = 8,
+               trControl = tr_control)
+               
+# make predictions using test set
+preds <- predict(dtree, newdata = x_test)
+
+# calculate accuracy on test set
+test_set_acc <- sum(y_test == preds)/length(preds)
+print(paste(c("Accuracy:" , round(test_set_acc, 4))))
+
+# 5random forest, ensembling
+# Train the decision tree model
+set.seed(123)
+rfmodel <- train(x = x_train,
+                 y = y_train,
+                 method = 'rf',
+                 tuneLength = 3,
+                 ntree = 100,
+                 trControl = tr_control)
+                 
+preds <- predict(rfmodel, newdata = x_test)
+
+# calculate accuracy on test set
+test_set_acc <- sum(y_test == preds)/length(preds)
+print(paste(c("Accuracy:" , round(test_set_acc, 4))))
+
+# 6 xgboost algorithm, handle missing values
+# features to use
+features <- c('FIRE_YEAR', 'FIRE_SIZE', 'DISCOVERY_DOY', 'LATITUDE', 'LONGITUDE', 'BURN_TIME')
+
+x_train <- as.data.frame(fires[train_index, features])
+y_train <- fires$STAT_CAUSE_DESCR[train_index]
+
+x_test <- as.data.frame(fires[test_index, features])
+y_test <- fires$STAT_CAUSE_DESCR[test_index]
+
+tr_control <- trainControl(
+    method = 'cv',
+    number = 2,
+    verboseIter = FALSE,
+    allowParallel = TRUE)
+    
+tune_grid <- expand.grid(
+    nrounds = c(100),
+    max_depth = c(8),
+    eta = c(0.1),
+    gamma = c(0.01),
+    colsample_bytree = c(0.75),
+    subsample = c(0.5),
+    min_child_weight = c(0))
+
+# Train the decision tree model
+set.seed(123)
+xgbmodel <- train(
+    x = x_train,
+    y = y_train,
+    method = 'xgbTree',
+    trControl = tr_control,
+    tuneGrid = tune_grid)
+# make predictions using test set
+preds <- predict(xgbmodel, newdata = x_test)
+
+# calculate accuracy on test set
+test_set_acc <- sum(y_test == preds)/length(preds)
+print(paste(c("Accuracy:" , round(test_set_acc, 4))))
+
+Conclusion
+That’s it for this kernel; however we’ve only scratched the surface of what we can do. There are a number of other things we can do to improve the accuracy. We could:
+
+Add more features. I’ve only used the features suggested in the Overview. But there’s no reason we couldn’t use several of the other features.
+Use more data. In the interest of keeping this this script under the 1 hour kaggle execution time limit, I’ve only used 10% of the full dataset. However, you could certainly increase this to see if more data improves accuracy.
+Try feature engineering by creating other features from the ones that already exist.
+Try other algorithms like neural networks.
+Try other performance metrics to get a better grasp on within-class accuracy.
+
